@@ -217,16 +217,27 @@ class BlackJack:
             return self.STAND
         return self.HIT
 
-    def monte_carlo_on_policy_comparison(self):
-        states_usable_ace_0, states_no_usable_ace0 = self.monte_carlo_on_policy(
-            episodes=5000
-        )
-        states_usable_ace_1, states_no_usable_ace1 = self.monte_carlo_on_policy(
-            episodes=100000
-        )
-        states_usable_ace_2, state_no_usable_ace2 = self.monte_carlo_on_policy(
-            episodes=500000
-        )
+    def monte_carlo_on_policy_comparison(self, algorithm):
+        if algorithm == "ON_POLICY":
+            states_usable_ace_0, states_no_usable_ace0 = self.monte_carlo_on_policy(
+                episodes=5000
+            )
+            states_usable_ace_1, states_no_usable_ace1 = self.monte_carlo_on_policy(
+                episodes=100000
+            )
+            states_usable_ace_2, state_no_usable_ace2 = self.monte_carlo_on_policy(
+                episodes=500000
+            )
+        if algorithm == "FIRST_VISITS":
+            states_usable_ace_0, states_no_usable_ace0 = self.montecarlo_first_visit(
+                episodes=5000
+            )
+            states_usable_ace_1, states_no_usable_ace1 = self.montecarlo_first_visit(
+                episodes=100000
+            )
+            states_usable_ace_2, state_no_usable_ace2 = self.montecarlo_first_visit(
+                episodes=500000
+            )
 
         states = [
             states_usable_ace_0,
@@ -264,5 +275,4 @@ class BlackJack:
 
 if __name__ == "__main__":
     bj = BlackJack()
-    # bj.monte_carlo_on_policy_comparison()
-    bj.montecarlo_first_visit()
+    bj.monte_carlo_on_policy_comparison(algorithm="FIRST_VISITS")
