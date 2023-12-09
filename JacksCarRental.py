@@ -141,10 +141,10 @@ class JacksCarRental:
 
 
 if __name__ == "__main__":
-    jacks = JacksCarRental()
+    jacks = JacksCarRental(max_cars=50, max_move_of_cars=13)
     policy, v, kPolicies = jacks.policy_iteration()
 
-    env = GENV("4-Jack")
+    env = GENV("4-Jack_advanced")
     env.createResDir()
     env.save_value_iter(kPolicies, "Jacks car rental - Policies", with_steps=True)
     env.save_value_iter(v, "Jacks car rental - Value function", with_steps=False)
