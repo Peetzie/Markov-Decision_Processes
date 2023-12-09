@@ -80,12 +80,13 @@ class BlackJack:
         else:
             return -1
 
-    def play(self, player_policy=None, initial_state=None, initial_action=None):
+    def play(self, player_policy_f=None, initial_state=None, initial_action=None):
         # init policies
-        if player_policy is None:
+        if player_policy_f is None:
             player_policy = self.init_policy(dealer=False)
         else:
-            player_policy = player_policy
+            player_policy = player_policy_f
+
         dealer_policy = self.init_policy(dealer=True)
 
         player_history = []
@@ -97,7 +98,10 @@ class BlackJack:
                 action = initial_action
                 initial_action = None
             else:
-                action = player_policy(ace_player, player_sum, dealer_card1)
+                if player_policy_f is not None:
+                    action = player_policy(ace_player, player_sum, dealer_card1)
+                else:
+                    action = self.init_policy(dealer=False)[player_sum]
 
             player_history.append((ace_player, player_sum, dealer_card1, action))
 
@@ -280,7 +284,7 @@ class BlackJack:
         return Q / QCounter
 
     def monte_carlo_exploring_starts_comparison(self):
-        Q = self.MSES(episodes=500000)
+        Q = self.MSES(episodes=1000000)
 
         Q_no_usable_ace = np.max(Q[:, :, 0, :], axis=-1)
         Q_usable_ace = np.max(Q[:, :, 1, :], axis=-1)
@@ -377,6 +381,6 @@ class BlackJack:
 
 if __name__ == "__main__":
     bj = BlackJack()
-    # bj.monte_carlo_on_policy_comparison(algorithm="FIRST_VISITS")
+    bj.monte_carlo_on_policy_comparison(algorithm="FIRST_VISITS")
     bj.MSES(episodes=10000)
     bj.monte_carlo_exploring_starts_comparison()
