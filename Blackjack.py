@@ -66,7 +66,7 @@ class BlackJack:
             # Use ace
             dealer_sum -= 10
         assert dealer_sum <= 21
-        assert player_sum <= 21
+        assert player_sum <= 21 and player_sum >= 12
 
         state = [ace_player, player_sum, dealer_card1]
         return state, dealer_sum, ace_dealer
@@ -84,6 +84,8 @@ class BlackJack:
         # init policies
         if player_policy is None:
             player_policy = self.init_policy(dealer=False)
+        else:
+            player_policy = player_policy
         dealer_policy = self.init_policy(dealer=True)
 
         player_history = []
@@ -95,7 +97,7 @@ class BlackJack:
                 action = initial_action
                 initial_action = None
             else:
-                action = player_policy[player_sum]
+                action = player_policy(ace_player, player_sum, dealer_card1)
 
             player_history.append((ace_player, player_sum, dealer_card1, action))
 
@@ -217,6 +219,106 @@ class BlackJack:
             return self.STAND
         return self.HIT
 
+    def MSES(self, episodes):
+        Q = np.zeros(
+            (10, 10, 2, 2)
+        )  # state action value state = (sum, card, usable ace) action
+        QCounter = np.ones((10, 10, 2, 2))
+
+        # Random policy
+        def behavior_policy(usable_ace, player_sum, dealer_card):
+            usable_ace = int(usable_ace)
+            player_sum -= 12
+            dealer_card -= 1
+            # argmax
+            values = (
+                Q[player_sum, dealer_card, usable_ace, :]
+                / QCounter[player_sum, dealer_card, usable_ace, :]
+            )
+            return np.random.choice(
+                [
+                    action_
+                    for action_, value_ in enumerate(values)
+                    if value_ == np.max(values)
+                ]
+            )
+
+        def s0A0random():
+            initial_state = [
+                bool(np.random.choice([0, 1])),
+                np.random.choice(range(12, 22)),
+                np.random.choice(range(1, 11)),
+            ]
+            initial_action = np.random.choice(self.ACTIONS)
+            return initial_state, initial_action
+
+        # Q learning
+        for episode in tqdm(range(episodes)):
+            initial_state, initial_action = s0A0random()
+            # Force exploring at the beginning
+            if episode:
+                current_policy = behavior_policy
+            else:
+                current_policy = self.target_policy_player
+            state, reward, player_history = self.play(
+                current_policy, initial_state, initial_action
+            )
+
+            first_visit_check = set()
+            for ace, player_sum, dealer_card, action in player_history:
+                ace = int(ace)
+                player_sum -= 12
+                dealer_card -= 1
+                state_action = (player_sum, dealer_card, ace, action)
+                if state_action in first_visit_check:
+                    continue
+                first_visit_check.add(state_action)
+                QCounter[player_sum, dealer_card, ace, action] += 1
+                Q[player_sum, dealer_card, ace, action] += reward
+
+            # Get averages
+        return Q / QCounter
+
+    def monte_carlo_exploring_starts_comparison(self):
+        Q = self.MSES(episodes=500000)
+
+        Q_no_usable_ace = np.max(Q[:, :, 0, :], axis=-1)
+        Q_usable_ace = np.max(Q[:, :, 1, :], axis=-1)
+
+        action_no_usable_ace = np.argmax(Q[:, :, 0, :], axis=-1)
+        action_usable_ace = np.argmax(Q[:, :, 1, :], axis=-1)
+
+        images = [
+            action_usable_ace,
+            Q_usable_ace,
+            action_no_usable_ace,
+            Q_no_usable_ace,
+        ]
+        titles = [
+            "Optimal policy with usable Ace",
+            "Optimal value with usable Ace",
+            "Optimal policy without usable Ace",
+            "Optimal value without usable Ace",
+        ]
+
+        _, axes = plt.subplots(2, 2, figsize=(40, 30))
+        plt.subplots_adjust(wspace=0.1, hspace=0.2)
+        axes = axes.flatten()
+
+        for image, title, axis in zip(images, titles, axes):
+            fig = sns.heatmap(
+                np.flipud(image),
+                cmap="YlGnBu",
+                ax=axis,
+                xticklabels=range(1, 11),
+                yticklabels=list(reversed(range(12, 22))),
+            )
+            fig.set_ylabel("player sum", fontsize=30)
+            fig.set_xlabel("dealer showing", fontsize=30)
+            fig.set_title(title, fontsize=30)
+
+        plt.show()
+
     def monte_carlo_on_policy_comparison(self, algorithm):
         if algorithm == "ON_POLICY":
             states_usable_ace_0, states_no_usable_ace0 = self.monte_carlo_on_policy(
@@ -275,4 +377,6 @@ class BlackJack:
 
 if __name__ == "__main__":
     bj = BlackJack()
-    bj.monte_carlo_on_policy_comparison(algorithm="FIRST_VISITS")
+    # bj.monte_carlo_on_policy_comparison(algorithm="FIRST_VISITS")
+    bj.MSES(episodes=10000)
+    bj.monte_carlo_exploring_starts_comparison()
