@@ -69,6 +69,27 @@ class SimpleGridWorld:
             v = V
         return v.round(1)
 
+    def value_iteration(self):
+        V = np.zeros((self.WORLD_SIZE, self.WORLD_SIZE))
+        Delta = 1e-4
+
+        while True:
+            delta = 0
+            for i in range(self.WORLD_SIZE):
+                for j in range(self.WORLD_SIZE):
+                    old_v = V[i, j]
+                    values = []
+                    for action in self.ACTIONS:
+                        (nextI, nextJ), reward = self.step([i, j], action=action)
+                        # Expected reward
+                        val = reward + self.DISCOUNT * V[nextI, nextJ]
+                        values.append(val)
+                    V[i, j] = np.max(values)
+                    delta = max(delta, abs(old_v - V[i, j]))
+            if delta < Delta:
+                break
+        return V.round(1)
+
     def optimal_policy_evaluation_w_convergence_steps(self):
         """
         Evaluates the optimal policy by selecting the action that maximizes the reward. There for returning optimal value function,
@@ -141,3 +162,6 @@ if __name__ == "__main__":
         assignment="Optimal_value_function_convergence_steps",
         with_steps=True,
     )
+
+    vales = gw.value_iteration()
+    env.save_value_iter(value_function=vales, assignment="value_iteration")

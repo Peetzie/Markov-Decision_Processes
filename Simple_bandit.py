@@ -3,6 +3,9 @@ import numpy as np
 from tqdm import trange
 import seaborn as sns
 import pandas as pd
+from OSHelper import GENV
+
+sns.set_style("dark")
 
 
 class Bandit:
@@ -10,13 +13,18 @@ class Bandit:
         self.k = k_arm
         self.epsilon = epsilon
         self.initial = initial
-        self.sample_averages = sample_averages
-        self.q_estimation = np.zeros(self.k) + self.initial
+        # self.sample_averages = sample_averages
+        # self.q_estimation = np.zeros(self.k) + self.initial
         self.action_count = np.zeros(self.k)
+
+        self.average_reward = 0
 
     def reset(self):
         self.q_estimation = np.zeros(self.k) + self.initial
         self.action_count = np.zeros(self.k)
+        # Use normal distribution for accurate true data
+        self.q_true = np.random.randn(self.k)
+        self.best_action = np.argmax(self.q_true)
 
     def act(self):
         if np.random.rand() < self.epsilon:
@@ -24,66 +32,71 @@ class Bandit:
         return np.argmax(self.q_estimation)
 
     def step(self, action):
-        reward = np.random.randn()  # Reward from a normal distribution
+        # Generate reward
+        reward = np.random.randn() + self.q_true[action]
         self.action_count[action] += 1
-        if self.sample_averages:
-            self.q_estimation[action] += (
-                reward - self.q_estimation[action]
-            ) / self.action_count[action]
-        else:
-            self.q_estimation[action] += 0.1 * (reward - self.q_estimation[action])
+        self.q_estimation[action] += (
+            reward - self.q_estimation[action]
+        ) / self.action_count[action]
+        self.average_reward += (reward - self.average_reward) / self.action_count
+
         return reward
 
 
 def plot_2_1(k):
     # We add k to the array to introduce variability for each of the rewards
     dataset = np.random.randn(1000, k) + np.random.randn(k)
-    plt.figure(figsize=(20, 10))
+    fig = plt.figure(figsize=(10, 5))
     sns.violinplot(data=dataset)
     plt.xlabel("Action")
     plt.ylabel("Reward distribution")
-    plt.show()
+    env.save_img(img=fig, name="Reward_disribution")
 
 
-def simulate(runs, time, bandit):
-    rewards = np.zeros((runs, time, bandit.k))
-    best_action_counts = np.zeros((runs, time))
-
-    for r in trange(runs, desc="Simulating"):
-        bandit.reset()
-
-        for t in range(time):
-            action = bandit.act()
-            reward = bandit.step(action)
-            rewards[r, t, :] = bandit.q_estimation
-            best_action_counts[r, t] = (
-                1 if action == np.argmax(bandit.q_estimation) else 0
-            )
-
-    mean_best_action_counts = best_action_counts.mean(axis=0)
-    mean_rewards = rewards.mean(axis=0)
-
+def simulate(runs, time, bandits):
+    rewards = np.zeros((len(bandits), runs, time))
+    best_action_counts = np.zeros(rewards.shape)
+    for i, bandit in enumerate(bandits):
+        for r in trange(runs):
+            bandit.reset()
+            for t in range(time):
+                action = bandit.act()
+                reward = bandit.step(action)
+                rewards[i, r, t] = reward
+                if action == bandit.best_action:
+                    best_action_counts[i, r, t] = 1
+    mean_best_action_counts = best_action_counts.mean(axis=1)
+    mean_rewards = rewards.mean(axis=1)
     return mean_best_action_counts, mean_rewards
 
 
-def plot_figure_2_2(bandit, runs=4000, time=2000):
-    epsilons = np.arange(0.001, 0.5, 0.003)
-    plt.figure(figsize=(10, 8))
+def figure_2_2(runs=8000, time=2000):
+    epsilons = [0, 0.1, 0.01, 1]
+    bandits = [Bandit(epsilon=eps, sample_averages=True) for eps in epsilons]
+    best_action_counts, rewards = simulate(runs, time, bandits)
 
-    for epsilon in epsilons:
-        bandit.reset()
-        bandit.epsilon = epsilon
-        best_action_counts, _ = simulate(runs, time, bandit)
-        plt.plot(best_action_counts, label=f"$\epsilon = {epsilon}$")
-
-    plt.xlabel("Steps")
-    plt.ylabel("% Optimal Action")
-    plt.title("Figure 2.2: Greedy-$\epsilon$ Action Selection")
+    fig = plt.figure(figsize=(10, 5))
+    for eps, rewards in zip(epsilons, rewards):
+        sns.lineplot(rewards, label="$\epsilon = %.02f$" % (eps))
+    plt.xlabel("steps")
+    plt.ylabel("average reward")
     plt.legend()
-    plt.show()
+    plt.title("Average reward (mean) over simulation steps")
+    env.save_img(img=fig, name="Mean_Reward")
+
+    fig = plt.figure(figsize=(10, 5))
+    for eps, counts in zip(epsilons, best_action_counts):
+        sns.lineplot(counts, label="$\epsilon = %.02f$" % (eps))
+    plt.xlabel("steps")
+    plt.ylabel("% optimal action")
+    plt.legend()
+    plt.title("Optimal action (mean) over simulation steps")
+    env.save_img(img=fig, name="optimal_actions")
 
 
 if __name__ == "__main__":
-    bandit = Bandit(k_arm=10, epsilon=0.1, initial=0.0, sample_averages=True)
+    env = GENV(chap=2)
+    env.createResDir()
+    env.createResDir(images=True)
     plot_2_1(k=10)
-    plot_figure_2_2(bandit)
+    figure_2_2()

@@ -1,5 +1,6 @@
 import os
 from tabulate import tabulate
+import matplotlib.pyplot as plt
 
 
 class GENV:
@@ -7,9 +8,16 @@ class GENV:
         self.chap = chap
         self.path = f"res/chap{self.chap}"
 
-    def createResDir(self):
-        if not os.path.exists(path=self.path):
-            os.makedirs(self.path)
+    def createResDir(self, images=None):
+        if images is None:
+            if not os.path.exists(path=self.path):
+                os.makedirs(self.path)
+        else:
+            if not os.path.exists(path=f"{self.path}/images"):
+                os.makedirs(f"{self.path}/images")
+
+    def save_img(self, img, name):
+        img.savefig(f"{self.path}/images/{name}")
 
     def save_value_iter(self, value_function, assignment, with_steps=False):
         with open(
