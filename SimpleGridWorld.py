@@ -1,5 +1,11 @@
 import numpy as np
 from OSHelper import GENV
+import time
+from tqdm import tqdm
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+sns.set_style("dark")
 
 
 class SimpleGridWorld:
@@ -7,8 +13,8 @@ class SimpleGridWorld:
     Example Gridworld from Barton and Sutton - Introduction to Reinforcement Learning
     """
 
-    def __init__(self) -> None:
-        self.WORLD_SIZE = 4
+    def __init__(self, WORLD_SIZE=4):
+        self.WORLD_SIZE = WORLD_SIZE
         self.DISCOUNT = 0.9
 
         # left, up, right, down
@@ -139,6 +145,62 @@ class SimpleGridWorld:
             v = V
         return v.round(1)
 
+    def linear_solver(self):
+        """
+        Solve the system of linear equation to find an exact solution.
+        """
+        A = -1 * np.eye(self.WORLD_SIZE * self.WORLD_SIZE)
+
+        b = np.zeros(self.WORLD_SIZE * self.WORLD_SIZE)
+        for i in range(self.WORLD_SIZE):
+            for j in range(self.WORLD_SIZE):
+                s = [i, j]  # current state
+                index_s = np.ravel_multi_index(s, (self.WORLD_SIZE, self.WORLD_SIZE))
+                for a in self.ACTIONS:
+                    s_, r = self.step(s, a)
+                    index_s_ = np.ravel_multi_index(
+                        s_, (self.WORLD_SIZE, self.WORLD_SIZE)
+                    )
+
+                    A[index_s, index_s_] += self.ACTION_PROB * self.DISCOUNT
+                    b[index_s] -= self.ACTION_PROB * r
+
+        x = np.linalg.solve(A, b)
+        return x.round(1)
+
+    def timer_comparison(self, num_itrations=500):
+        solvers = [
+            self.iterative_policy_evaluation,
+            self.optimal_policy_policy_evaluation,
+            self.optimal_policy_evaluation_w_convergence_steps,
+            self.value_iteration,
+            self.linear_solver,
+        ]
+        all_times = []
+
+        for solver_function in solvers:
+            times = []
+            for i in tqdm(range(num_itrations)):
+                start_time = time.time()
+                solver_function()
+                end_time = time.time()
+                times.append(end_time - start_time)
+
+            average_time = sum(times) / num_itrations
+            all_times.append(times)
+            print(f"{solver_function.__name__} - Average Time: {average_time} seconds")
+
+        fig = plt.figure(figsize=(10, 6))
+        for i, solver_function in enumerate(solvers):
+            sns.lineplot(all_times[i], label=solver_function.__name__)
+
+        plt.xlabel("Iteration")
+        plt.ylabel("Time (seconds)")
+        plt.legend()
+        plt.title("Solver Comparison")
+        env.createResDir(images=True)
+        env.save_img(img=fig, name=f"{solver_function.__name__}_{self.WORLD_SIZE}")
+
 
 if __name__ == "__main__":
     env = GENV(chap=4)
@@ -146,14 +208,21 @@ if __name__ == "__main__":
     gw = SimpleGridWorld()
     # Perform value iteration
 
+    start_time = time.time()
     value_function = gw.iterative_policy_evaluation()
+    print(value_function)
+    end_time = time.time()
     env.save_value_iter(value_function, "iterative_policy_evaluation")
+    print(f"Iterative policy evaluation took {end_time-start_time} seconds")
 
     # find optimal value function
+    start_time = time.time()
     optimal_value_function = gw.optimal_policy_policy_evaluation()
+    end_time = time.time()
     env.save_value_iter(
         value_function=optimal_value_function, assignment="Optimal_value_function"
     )
+    print(f"Policy evlaution took: {end_time-start_time} seconds")
 
     # Convergence steps
     conv_steps = gw.optimal_policy_evaluation_w_convergence_steps()
@@ -162,6 +231,24 @@ if __name__ == "__main__":
         assignment="Optimal_value_function_convergence_steps",
         with_steps=True,
     )
+    start_time = time.time()
+    values = gw.value_iteration()
+    end_time = time.time()
+    env.save_value_iter(value_function=values, assignment="value_iteration")
+    print(f"Value iteration took {end_time-start_time} seconds")
+    print(type(values))
 
-    vales = gw.value_iteration()
-    env.save_value_iter(value_function=vales, assignment="value_iteration")
+    # Linear approach
+    start_time = time.time()
+    v = gw.linear_solver()
+    end_time = time.time()
+    v = v.reshape((gw.WORLD_SIZE, gw.WORLD_SIZE))  # Convert to grid to create tabular.
+    env.save_value_iter(value_function=v, assignment="Linear Programming approach")
+    print(f"The linear approach took {end_time-start_time} seconds")
+
+    # Combined testing method
+    gw.timer_comparison(num_itrations=1000)
+
+    # Larger world
+    gw = SimpleGridWorld(WORLD_SIZE=30)
+    gw.timer_comparison(num_itrations=1000)
