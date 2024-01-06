@@ -68,7 +68,7 @@ def simulate(runs, time, bandits):
     mean_best_action_counts = best_action_counts.mean(axis=1)
     mean_rewards = rewards.mean(axis=1)
     return mean_best_action_counts, mean_rewards
-    
+
 
 def figure_2_2(runs=8000, time=2000):
     epsilons = [0, 0.1, 0.01, 1]

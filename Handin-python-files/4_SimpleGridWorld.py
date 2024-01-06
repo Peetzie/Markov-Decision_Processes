@@ -1,11 +1,16 @@
 import numpy as np
 from OSHelper import GENV
+from colorama import init, Fore, Back, Style
 import time
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import seaborn as sns
 
 sns.set_style("dark")
+# Initialize colorama
+init(autoreset=True)
+# Initialize helper class
+env = GENV(chap=4)
 
 
 class SimpleGridWorld:
@@ -15,7 +20,7 @@ class SimpleGridWorld:
 
     def __init__(self, WORLD_SIZE=4):
         self.WORLD_SIZE = WORLD_SIZE
-        self.DISCOUNT = 0.9
+        self.DISCOUNT = 0.99999
 
         # left, up, right, down
         self.ACTIONS = [
@@ -168,11 +173,76 @@ class SimpleGridWorld:
         x = np.linalg.solve(A, b)
         return x.round(1)
 
+    def policy_evaluation(self):
+        """
+        Evaluates and improves the optimal policy by selecting the action that maximizes the reward.
+        Returns both the optimal value function and the optimal policy.
+        """
+        v = np.zeros((self.WORLD_SIZE, self.WORLD_SIZE))
+        # Initialize the policy with a default action, e.g., 0 (left)
+        policy = np.zeros((self.WORLD_SIZE, self.WORLD_SIZE), dtype=int)
+        delta = 1e-4
+        policy_stable = False
+
+        while not policy_stable:
+            # Policy Evaluation
+            while True:
+                V = np.zeros_like(v)
+                for i in range(self.WORLD_SIZE):
+                    for j in range(self.WORLD_SIZE):
+                        action = self.ACTIONS[
+                            policy[i, j]
+                        ]  # Action according to current policy
+                        (nextI, nextJ), reward = self.step([i, j], action)
+                        V[i, j] = reward + self.DISCOUNT * v[nextI, nextJ]
+
+                if np.sum(np.abs(v - V)) < delta:
+                    break
+                v = V
+
+            # Policy Improvement
+            policy_stable = True
+            for i in range(self.WORLD_SIZE):
+                for j in range(self.WORLD_SIZE):
+                    old_action = policy[i, j]
+                    action_values = []
+                    for a_idx, action in enumerate(self.ACTIONS):
+                        (nextI, nextJ), reward = self.step([i, j], action)
+                        action_value = reward + self.DISCOUNT * v[nextI, nextJ]
+                        action_values.append(action_value)
+
+                    best_action = np.argmax(action_values)
+                    policy[i, j] = best_action
+
+                    if old_action != best_action:
+                        policy_stable = False
+
+        return v.round(1), policy
+
+    def reduced_policy_evaluation(self):
+        next_state_values = np.zeros((self.WORLD_SIZE, self.WORLD_SIZE))
+        # Initialize the policy with a default action, e.g., 0 (left)
+        policy = np.zeros((self.WORLD_SIZE, self.WORLD_SIZE), dtype=int)
+        delta = 1e-4
+        while True:
+            state_values = next_state_values.copy()
+            for i in range(self.WORLD_SIZE):
+                for j in range(self.WORLD_SIZE):
+                    value = 0
+                    for action in self.ACTIONS:
+                        (nextI, nextJ), reward = self.step([i, j], action)
+                        value += self.ACTION_PROB * (
+                            reward + self.DISCOUNT * state_values[nextI, nextJ]
+                        )
+                    next_state_values[i, j] = value
+            if np.sum(np.abs(state_values - next_state_values)) < delta:
+                break
+
+            return next_state_values.round(1), policy
+
     def timer_comparison(self, num_itrations=500):
         solvers = [
-            self.iterative_policy_evaluation,
-            self.optimal_policy_policy_evaluation,
-            self.optimal_policy_evaluation_w_convergence_steps,
+            self.reduced_policy_evaluation,
             self.value_iteration,
             self.linear_solver,
         ]
@@ -202,15 +272,14 @@ class SimpleGridWorld:
         env.save_img(img=fig, name=f"{solver_function.__name__}_{self.WORLD_SIZE}")
 
 
-if __name__ == "__main__":
-    env = GENV(chap=4)
-    env.createResDir()
+def TEST():
+    print(Fore.RED + "[##### TESTING ENVIROMENT #####]")
     gw = SimpleGridWorld()
+    env.createResDir()
     # Perform value iteration
 
     start_time = time.time()
     value_function = gw.iterative_policy_evaluation()
-    print(value_function)
     end_time = time.time()
     env.save_value_iter(value_function, "iterative_policy_evaluation")
     print(f"Iterative policy evaluation took {end_time-start_time} seconds")
@@ -236,7 +305,6 @@ if __name__ == "__main__":
     end_time = time.time()
     env.save_value_iter(value_function=values, assignment="value_iteration")
     print(f"Value iteration took {end_time-start_time} seconds")
-    print(type(values))
 
     # Linear approach
     start_time = time.time()
@@ -246,9 +314,24 @@ if __name__ == "__main__":
     env.save_value_iter(value_function=v, assignment="Linear Programming approach")
     print(f"The linear approach took {end_time-start_time} seconds")
 
-    # Combined testing method
-    gw.timer_comparison(num_itrations=1000)
+    # Slimmed policy evalautaion
+    start_time = time.time()
+    v, _ = gw.reduced_policy_evaluation()
+    end_time = time.time()
+    v = v.reshape((gw.WORLD_SIZE, gw.WORLD_SIZE))  # Convert to grid to create tabular.
+    env.save_value_iter(value_function=v, assignment="Reduced_policy_evaluation")
+    print(f"The linear approach took {end_time-start_time} seconds")
 
-    # Larger world
-    gw = SimpleGridWorld(WORLD_SIZE=30)
-    gw.timer_comparison(num_itrations=1000)
+
+def multipleWorldSim():
+    print(Fore.GREEN + "#### MULTIPLE WORLD SIM ####")
+    WORLD_SIZES = [4, 10, 30, 60, 150, 300]
+    for size in WORLD_SIZES:
+        print(Fore.GREEN + f"Simulating world_size: {size}")
+        gw = SimpleGridWorld(WORLD_SIZE=size)
+        gw.timer_comparison(num_itrations=100)
+
+
+if __name__ == "__main__":
+    TEST()
+    multipleWorldSim()
