@@ -214,7 +214,8 @@ class BlackJack:
         return states_values_usable_ace, states_values_no_usable_ace
 
     # function form of target policy of player
-    def target_policy_player(self, player_sum, POLICY_PLAYER):
+    def target_policy_player(self, ace_player, player_sum, dealer_card):
+        POLICY_PLAYER = self.init_policy(dealer=False)  # Assuming this is your policy
         return POLICY_PLAYER[player_sum]
 
     # function form of behavior policy of player
