@@ -2,6 +2,10 @@ import numpy as np
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import seaborn as sns
+from OSHelper import GENV
+from colorama import init, Fore, Back, Style
+
+ENV = GENV("-BlackJack")
 
 
 class BlackJack:
@@ -152,6 +156,7 @@ class BlackJack:
         Estimating the state-value function by simulation
         """
         states_usable_ace = np.zeros((10, 10))
+        print(Fore.CYAN + "Running Monte Carlo On Policy Simualtions")
 
         # Initialize counts to 1 to avoid 0 div.
         states_usable_ace_count = np.ones((10, 10))
@@ -159,7 +164,9 @@ class BlackJack:
         states_no_usable_ace = np.zeros((10, 10))
 
         states_no_usable_ace_count = np.ones((10, 10))
-        for i in tqdm(range(0, episodes), desc=f"Simulating episode: {episodes}"):
+        for i in tqdm(
+            range(0, episodes), desc=Fore.GREEN + f"Simulating episode: {episodes}"
+        ):
             state, reward, player_history = self.play()
             for ace_player, player_sum, dealer_card, _ in player_history:
                 player_sum -= 12
@@ -229,6 +236,7 @@ class BlackJack:
             (10, 10, 2, 2)
         )  # state action value state = (sum, card, usable ace) action
         QCounter = np.ones((10, 10, 2, 2))
+        print(Fore.CYAN + "Running Monte Carlo Exploring Starts")
 
         # Random policy
         def behavior_policy(usable_ace, player_sum, dealer_card):
@@ -258,7 +266,7 @@ class BlackJack:
             return initial_state, initial_action
 
         # Q learning
-        for episode in tqdm(range(episodes)):
+        for episode in tqdm(range(episodes), desc=Fore.GREEN + "Running episodes"):
             initial_state, initial_action = s0A0random()
             # Force exploring at the beginning
             if episode:
@@ -284,8 +292,8 @@ class BlackJack:
             # Get averages
         return Q / QCounter
 
-    def monte_carlo_exploring_starts_comparison(self):
-        Q = self.MSES(episodes=1000000)
+    def monte_carlo_exploring_starts_comparison(self, episodes=1000000):
+        Q = self.MSES(episodes=episodes)
 
         Q_no_usable_ace = np.max(Q[:, :, 0, :], axis=-1)
         Q_usable_ace = np.max(Q[:, :, 1, :], axis=-1)
@@ -306,7 +314,7 @@ class BlackJack:
             "Optimal value without usable Ace",
         ]
 
-        _, axes = plt.subplots(2, 2, figsize=(40, 30))
+        total_img, axes = plt.subplots(2, 2, figsize=(40, 30))
         plt.subplots_adjust(wspace=0.1, hspace=0.2)
         axes = axes.flatten()
 
@@ -321,8 +329,11 @@ class BlackJack:
             fig.set_ylabel("player sum", fontsize=30)
             fig.set_xlabel("dealer showing", fontsize=30)
             fig.set_title(title, fontsize=30)
-
-        plt.show()
+        ENV.save_img(img=total_img, name="Policy Image - Monte Carlo Exploring Starts")
+        ENV.save_value_iter(
+            value_function=action_no_usable_ace, assignment="No usable ace"
+        )
+        ENV.save_value_iter(value_function=action_usable_ace, assignment="Usable ace")
 
     def monte_carlo_on_policy_comparison(self, algorithm):
         if algorithm == "ON_POLICY":
@@ -363,7 +374,7 @@ class BlackJack:
             "No Usable Ace, 500000 Episodes",
         ]
 
-        _, axes = plt.subplots(2, 3, figsize=(40, 30))
+        total_img, axes = plt.subplots(2, 3, figsize=(40, 30))
         axes = axes.flatten()
 
         for state, title, axis in zip(states, titles, axes):
@@ -377,11 +388,11 @@ class BlackJack:
             fig.set_ylabel("player sum", fontsize=30)
             fig.set_xlabel("dealer showing", fontsize=30)
             fig.set_title(title, fontsize=30)
-        plt.show()
+        ENV.save_img(total_img, "Policy Image - Policy comparison")
 
 
 if __name__ == "__main__":
     bj = BlackJack()
-    bj.monte_carlo_on_policy_comparison(algorithm="FIRST_VISITS")
-    bj.MSES(episodes=10000)
-    bj.monte_carlo_exploring_starts_comparison()
+    ENV.createResDir(images=True)
+
+    bj.monte_carlo_exploring_starts_comparison(episodes=200000000)
