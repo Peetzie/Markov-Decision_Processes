@@ -13,16 +13,14 @@ class Bandit:
         self.k = k_arm
         self.epsilon = epsilon
         self.initial = initial
-        # self.sample_averages = sample_averages
-        # self.q_estimation = np.zeros(self.k) + self.initial
         self.action_count = np.zeros(self.k)
-
         self.average_reward = 0
 
     def reset(self):
         self.q_estimation = np.zeros(self.k) + self.initial
         self.action_count = np.zeros(self.k)
         # Use normal distribution for accurate true data
+
         self.q_true = np.random.randn(self.k)
         self.best_action = np.argmax(self.q_true)
 

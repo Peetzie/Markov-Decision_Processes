@@ -1,0 +1,155 @@
+### A Pluto.jl notebook ###
+# v0.19.32
+
+using Markdown
+using InteractiveUtils
+
+# ╔═╡ abd1db56-ad80-11ee-264d-bbf1069fd62f
+using Pkg; Pkg.add("DiscreteValueIteration"); Pkg.add("LocalApproximationValueIteration")
+
+# ╔═╡ bd2ff20a-d569-4543-a037-d3945cbd29fd
+using DiscreteValueIteration, POMDPs, POMDPModels, GridInterpolations, LocalFunctionApproximation, LocalApproximationValueIteration, Plots, Statistics
+
+# ╔═╡ a55e8631-243e-4e78-a7ff-fcd34bf3dff7
+# Create ScaleAbleFunctionForTheGridWorldProblem
+function create_scaled_gridworld(size::Tuple{Int, Int})
+    # Defining the middle section of the grid for rewards
+    mid_x = Int(round(size[1] / 2))
+    mid_y = Int(round(size[2] / 2))
+    reward_range = (mid_x - 10):(mid_x + 10), (mid_y - 10):(mid_y + 10)
+
+    # Defining rewards: rewarding cells in the middle section
+    rewards = Dict(GWPos(x, y) => 10.0 for x in reward_range[1], y in reward_range[2])
+
+    # Create the SimpleGridWorld MDP
+    mdp = SimpleGridWorld(
+        size = size,
+        rewards = rewards
+    )
+
+    return mdp
+end
+
+
+
+# ╔═╡ 2b4e3ed2-817d-49b4-b161-23e7529d9559
+MDP = create_scaled_gridworld((500,500))
+
+# ╔═╡ 4bba03ac-6cf9-4aa1-b5f2-d3abdb2c117c
+function create_grid_interpolation(grid_size::Int, vertices_per_axis::Int = 10)
+    # Calculate the step size and round it to the nearest integer
+    step_size = round(Int, grid_size / (vertices_per_axis - 1))
+
+    # Create the RectangleGrid using the step size
+    grid = RectangleGrid(
+        1:step_size:grid_size, # x-axis
+        1:step_size:grid_size  # y-axis
+    )
+
+    # Create the LocalGIFunctionApproximator
+    interp = LocalGIFunctionApproximator(grid)
+
+    return interp
+end
+
+
+
+
+# ╔═╡ b0469499-1b8a-4376-a9bf-928bfbeb7664
+
+
+# ╔═╡ 54f74109-e4c6-4ff1-b487-b2c2ceda1122
+## APPROXIMATION ##
+begin
+	# Example usage for a 100x100 grid
+	interp = create_grid_interpolation(500, 50)
+	approx_solver = LocalApproximationValueIterationSolver(interp, verbose=true, max_iterations=1000, is_mdp_generative=false)
+	approx_policy = solve(approx_solver, MDP)
+end
+
+# ╔═╡ 7f1ee284-ff85-4294-a97c-cfbbdc503938
+function plot_running_times(grid_sizes::Vector{Int}, interp_sizes::Vector{Int})
+    runtimes = Dict{Tuple{Int, Int}, Float64}()
+
+    for grid_size in grid_sizes
+        for interp_size in interp_sizes
+            mdp = create_scaled_gridworld((grid_size, grid_size))
+            interp = create_grid_interpolation(grid_size, interp_size)
+
+            # Measure the time it takes to solve the MDP
+            start_time = time()
+            approx_solver = LocalApproximationValueIterationSolver(interp, verbose=false, max_iterations=1000, is_mdp_generative=false)
+            solve(approx_solver, mdp)
+            end_time = time()
+
+            runtimes[(grid_size, interp_size)] = end_time - start_time
+        end
+    end
+
+    # Initialize the plot
+    p = plot(
+        xlabel="Interpolation Size",
+        ylabel="Running Time (seconds)",
+        title="Running Times for Different Grid Sizes and Interpolation Sizes",
+        legend=:topright
+    )
+    
+    # Plot each line separately
+    for grid_size in grid_sizes
+        interp_sizes_times = [runtimes[(grid_size, interp_size)] for interp_size in interp_sizes]
+        plot!(interp_sizes, interp_sizes_times, label="Grid Size $grid_size")
+    end
+    
+    return p # This will cause Jupyter to display the plot
+end
+
+
+# ╔═╡ 13e7cade-caf3-4142-b361-ee0a37ff327f
+# Define sizes
+begin
+	grid_sizes = [100]
+	interp_sizes = [10]
+end
+
+# ╔═╡ deb1bf1e-f34d-48f8-8955-05c6cbcbcbb1
+# Call the function to plot the running times
+plot_running_times(grid_sizes, interp_sizes)
+
+# ╔═╡ 6deacb8f-30c4-47c6-9012-57c23ce950d4
+for size in grid_sizes
+	print(size, "\n")
+end
+
+# ╔═╡ a2e6c76e-68ae-43f4-a8d6-7612bf6d7a89
+v = value(approx_policy, [20,20])
+
+# ╔═╡ 16028c35-e7dd-4ca3-965b-9414c63dc767
+##### DISCRETE VALUE ITERATION ######
+
+# ╔═╡ a648ed2b-4b8d-4344-9b19-7de386813187
+begin
+	# Create solver
+	Disrecte_solver = ValueIterationSolver(max_iterations=1000, belres=1e-6, verbose=true)
+	
+	# Solve the MDP model
+	policy = solve(Disrecte_solver, MDP)
+	
+	# If needed, you can use LocalGIFunctionApproximator in conjunction with the policy
+end
+
+
+# ╔═╡ Cell order:
+# ╠═abd1db56-ad80-11ee-264d-bbf1069fd62f
+# ╠═bd2ff20a-d569-4543-a037-d3945cbd29fd
+# ╠═a55e8631-243e-4e78-a7ff-fcd34bf3dff7
+# ╠═2b4e3ed2-817d-49b4-b161-23e7529d9559
+# ╠═4bba03ac-6cf9-4aa1-b5f2-d3abdb2c117c
+# ╠═b0469499-1b8a-4376-a9bf-928bfbeb7664
+# ╠═54f74109-e4c6-4ff1-b487-b2c2ceda1122
+# ╠═7f1ee284-ff85-4294-a97c-cfbbdc503938
+# ╠═13e7cade-caf3-4142-b361-ee0a37ff327f
+# ╠═deb1bf1e-f34d-48f8-8955-05c6cbcbcbb1
+# ╠═6deacb8f-30c4-47c6-9012-57c23ce950d4
+# ╠═a2e6c76e-68ae-43f4-a8d6-7612bf6d7a89
+# ╠═16028c35-e7dd-4ca3-965b-9414c63dc767
+# ╠═a648ed2b-4b8d-4344-9b19-7de386813187
